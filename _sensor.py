@@ -19,6 +19,7 @@ class Sensor(object):
       cameraUpVector=cam_up_vector,
       cameraTargetPosition=target_pos,
     )
+    
     self.cam_pos = cam_pos
     self.cam_up_vector = cam_up_vector
     self.target_pos = target_pos
@@ -35,58 +36,60 @@ class Sensor(object):
     )
     self.proj_matrix = pb.computeProjectionMatrixFOV(70, 1, 0.001, 0.3)
 
-  def setPosition(self, position: List[float] = None):
-    dir = "/Users/tingxi/_BulletArm/BulletArm/bulletarm/pybullet/urdf/object/GraspNet1B_object/003/convex.obj"
-    obj = pyredner.load_obj(dir, return_objects=True)
-    newObj = obj
-    d_x, d_y, d_z = position[0], position[1], position[2]
-    newObj.vertices += torch.tensor([d_x, d_z, d_y])
-    return newObj
 
-  def rendering(self, cam_pos, cam_up_vector, target_pos, obj_list):
-
-    position = cam_pos
-    up = cam_up_vector
-    look_at = target_pos
-
-    camera = pyredner.Camera(position = position,
-                        look_at = look_at,
-                        up = up,
-                        fov = torch.tensor([30.0]), # in degree
-                        clip_near = 1e-2, # needs to > 0
-                        resolution = (128, 128),
-                        )
-
-    scene = pyredner.Scene(camera = camera, objects = obj_list)
-
-    chan_list = [pyredner.channels.depth]
-
-    img = pyredner.render_generic(scene, chan_list)
-
-    return img
 
   def getHeightmap(self, size, objs):
-    image_arr = pb.getCameraImage(width=size, height=size,
-                                  viewMatrix=self.view_matrix,
-                                  projectionMatrix=self.proj_matrix,
-                                  renderer=pb.ER_TINY_RENDERER)
-    depth_img = np.array(image_arr[3])
-    depth = self.far * self.near / (self.far - (self.far - self.near) * depth_img)
 
-    position = [0.03, 0.03, 0.0]
+    def setPosition(position: List[float] = None):
+      dir = "/Users/tingxi/_BulletArm/BulletArm/bulletarm/pybullet/urdf/object/GraspNet1B_object/003/convex.obj"
+      obj = pyredner.load_obj(dir, return_objects=True)
+      newObj = obj[0]
+      d_x, d_y, d_z = position[0], position[1], position[2]
+      newObj.vertices += torch.tensor([d_x, d_z, d_y])
+      return newObj
+
+    def rendering(cam_pos, cam_up_vector, target_pos, obj_list):
+      
+      cam_pos = torch.FloatTensor(cam_pos)
+      cam_up_vector = torch.FloatTensor(cam_up_vector)
+      target_pos = torch.FloatTensor(target_pos)
+
+      camera = pyredner.Camera(position = cam_pos,
+                          look_at = target_pos,
+                          up = cam_up_vector,
+                          fov = torch.tensor([30.0]), # in degree
+                          clip_near = 1e-2, # needs to > 0
+                          resolution = (128, 128)
+                          )
+      
+      scene = pyredner.Scene(camera = camera, objects = obj_list)
+      chan_list = [pyredner.channels.depth]
+      img = pyredner.render_generic(scene, chan_list)
+
+      return img.numpy()  
+    
+    #image_arr = pb.getCameraImage(width=size, height=size,
+    #                              viewMatrix=self.view_matrix,
+    #                              projectionMatrix=self.proj_matrix,
+    #                              renderer=pb.ER_TINY_RENDERER)
+    #depth_img = np.array(image_arr[3])
+    #depth = self.far * self.near / (self.far - (self.far - self.near) * depth_img)
+
+    #position = [0.03, 0.03, 0.0]
     obj_list = []
 
     for _ in objs:
       p = random.uniform(0.0, 1.0)
-      p = [p, 0, p]
+      p = torch.tensor([p, 0, p])
       newObj = setPosition(p)
       obj_list.append(newObj)
 
       #f=open("../../pos_info.txt","a")
       #f.write("object_index: " + str(obj) + ", pos: " + str(p) + "\n")
     #img = rendering(cameraEyePosition, cameraUpVector, cameraTargetPosition, obj_list)
-    img = rendering(self.cam_pos, self.cam_up_vector, self.target_pos, obj_list)
     #return np.abs(depth - np.max(depth)).reshape(size, size)
+
+    img = rendering(self.cam_pos, self.cam_up_vector, self.target_pos, obj_list)
     return img
 
   def getRGBImg(self, size):
